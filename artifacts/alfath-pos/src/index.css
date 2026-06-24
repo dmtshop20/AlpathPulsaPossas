@@ -6,6 +6,21 @@
   --font-serif: "Lora", ui-serif, Georgia, serif;
   --animate-marquee: marquee 15s linear infinite;
 
+  /* "Bersih & Profesional" accent: remap the blue ramp to a calmer indigo.
+     Centralized token refinement — every blue-* utility (bg/text/border/ring/
+     gradient) shifts cohesively without touching the JSX. Revert by deleting
+     this block. Dark-mode keeps its own hardcoded accent overrides below. */
+  --color-blue-50: #eef2ff;
+  --color-blue-100: #e0e7ff;
+  --color-blue-200: #c7d2fe;
+  --color-blue-300: #a5b4fc;
+  --color-blue-400: #818cf8;
+  --color-blue-500: #6366f1;
+  --color-blue-600: #4f46e5;
+  --color-blue-700: #4338ca;
+  --color-blue-800: #3730a3;
+  --color-blue-900: #312e81;
+
   @keyframes marquee {
     0% {
       transform: translateX(100%);
@@ -354,6 +369,21 @@ body {
 
 body {
   @apply font-sans;
+}
+
+/* "Bersih & Profesional" calm typography.
+   The app leaned on very wide UPPERCASE letter-spacing (tracking-widest used
+   277x) and cramped heading tracking, which read as stiff. These soften the
+   spacing globally — capitalization and layout are untouched, only the spread
+   is relaxed for a calmer, more premium rhythm. Reversible: delete this block. */
+.tracking-widest {
+  letter-spacing: 0.045em !important;
+}
+.tracking-wider {
+  letter-spacing: 0.025em !important;
+}
+.tracking-tighter {
+  letter-spacing: -0.02em !important;
 }
 
 /* Mobile card-view for list-style tables (opt-in via .mobile-cards). */
