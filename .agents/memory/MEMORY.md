@@ -1,3 +1,4 @@
 - [Multi-artifact socket.io routing](multi-artifact-socketio.md) — same-origin `io()` needs `/socket.io` added to the api artifact.toml `paths`, else the proxy sends it to the frontend.
 - [Prisma dual-schema pitfall](prisma-dual-schema.md) — Prisma prefers `./schema.prisma` over `./prisma/schema.prisma`; a stray root copy silently overrides edits.
 - [AlfathPOS authz & realtime model](alfathpos-authz-model.md) — REST is token-only by design; socket rooms must come from verified JWT (not client-sent role); stock decrements need conditional updateMany guard.
+- [AlfathPOS Docker deploy](alfathpos-docker-deploy.md) — single-stage api image keeps pnpm symlinks (Prisma resolution); entrypoint `db push` auto-creates tables; nginx proxies /api + /socket.io; build frontend with BASE_PATH=/.

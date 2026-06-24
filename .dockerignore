@@ -1,0 +1,10 @@
+**/node_modules
+.git
+.local
+.agents
+.migration-backup
+artifacts/api-server/dist
+artifacts/alfath-pos/dist
+**/.turbo
+**/*.log
+artifacts/api-server/.jwt-secret

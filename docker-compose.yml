@@ -1,0 +1,53 @@
+# AlfathPOS - local server deployment with Docker Compose.
+#
+# Quick start on your local server:
+#   1) git clone <this repo> && cd <repo>
+#   2) cp .env.example .env   (then edit .env and change the passwords/secret)
+#   3) docker compose up -d --build
+#   4) open http://<server-ip>:8080  (login: admin / admin123)
+#
+# The database and all tables are created AUTOMATICALLY on first start.
+# Data is stored in the "pgdata" volume and survives restarts/rebuilds.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-alfath}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-alfath}
+      POSTGRES_DB: ${POSTGRES_DB:-alfath}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-alfath} -d ${POSTGRES_DB:-alfath}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      context: .
+      dockerfile: artifacts/api-server/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-alfath}:${POSTGRES_PASSWORD:-alfath}@db:5432/${POSTGRES_DB:-alfath}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-change-this-to-a-long-random-string}
+      PORT: 8080
+      NODE_ENV: production
+
+  web:
+    build:
+      context: .
+      dockerfile: artifacts/alfath-pos/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-8080}:80"
+
+volumes:
+  pgdata:

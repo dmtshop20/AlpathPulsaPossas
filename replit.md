@@ -12,6 +12,13 @@ An Indonesian point-of-sale and stock/transaction management system for a multi-
 - Required env: `DATABASE_URL` (Postgres). Optional: `JWT_SECRET` — if unset, the server reads/creates a persisted random secret in `artifacts/api-server/.jwt-secret` (gitignored), so tokens survive restarts. There is no hardcoded fallback secret.
 - Seeded login credentials (created on server startup): `admin` / `admin123` (ADMIN), `cashier` / `cashier123` (CASHIER). Default branch: "Cabang Utama".
 
+### Local server (Docker Compose)
+
+- For self-hosting on a local server: `cp .env.example .env` (edit passwords/secret), then `docker compose up -d --build`. App opens at `http://<server-ip>:8080`.
+- Three services in `docker-compose.yml`: `db` (postgres:16-alpine + `pgdata` volume + healthcheck), `api` (Express/Prisma, `artifacts/api-server/Dockerfile`), `web` (nginx serving the Vite static build + reverse-proxying `/api` and `/socket.io` to `api:8080`, `artifacts/alfath-pos/Dockerfile` + `nginx.conf`).
+- DB schema/tables are created automatically on first boot: the api entrypoint (`artifacts/api-server/docker-entrypoint.sh`) runs `prisma db push --skip-generate` before starting, then the app's startup seed creates the default users/branch. Data persists in the `pgdata` volume across rebuilds.
+- Old/dev data does NOT transfer to a Docker install — it starts from an empty DB (only the seed). To carry data over, dump/restore Postgres manually.
+
 ## Stack
 
 - pnpm workspaces, Node.js, TypeScript
