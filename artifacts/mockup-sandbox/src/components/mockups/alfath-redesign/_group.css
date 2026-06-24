@@ -1,0 +1,27 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+.dark-command-theme {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+.dark-command-theme ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.dark-command-theme ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dark-command-theme ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+.dark-command-theme ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.glass-panel {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
