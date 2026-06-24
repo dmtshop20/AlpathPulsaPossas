@@ -17,6 +17,10 @@ inline own-branch checks inside handlers. The owner's authoritative role matrix:
   OWN branch only.
 
 **Server-side scoping rules that must not regress:**
+- Cashier READS are branch-scoped too, not just writes: `GET /api/transactions`,
+  `/api/incentives`, `/api/shifts`, `/api/adjustments` override/ignore any client
+  `branchId` and force `where.branchId = req.user.branchId` for CASHIER (ADMIN/AUDIT
+  stay global). Missing this is an IDOR/tenant-isolation break a review will fail on.
 - Cashier sales/refunds: branchId + cashier identity are forced from the JWT, never the
   request body (prevents spoofing another branch/cashier).
 - Cashier stock adjust is ADD-ONLY: reject `newQty` (opname) and `STOCK_OUT`/negative

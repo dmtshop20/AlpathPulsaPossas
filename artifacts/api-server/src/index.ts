@@ -545,9 +545,13 @@ app.post("/api/transactions", authenticateToken, requireRole("ADMIN", "CASHIER")
 
 app.get("/api/transactions", authenticateToken, async (req, res) => {
   const { branchId, startDate, endDate } = req.query;
+  const requester = (req as any).user;
   try {
     const where: any = {};
-    if (branchId) where.branchId = branchId as string;
+    // CASHIER reads are locked to their own branch; client-supplied branchId is ignored.
+    // ADMIN/AUDIT may read any/all branches.
+    if (requester.role === "CASHIER") where.branchId = requester.branchId;
+    else if (branchId) where.branchId = branchId as string;
     
     if (startDate || endDate) {
       where.createdAt = {};
@@ -595,10 +599,13 @@ app.get("/api/transactions", authenticateToken, async (req, res) => {
 
 app.get("/api/incentives", authenticateToken, async (req, res) => {
   const { cashierId, branchId } = req.query;
+  const requester = (req as any).user;
   try {
     const where: any = {};
     if (cashierId) where.cashierId = cashierId as string;
-    if (branchId) where.branchId = branchId as string;
+    // CASHIER reads are locked to their own branch; client-supplied branchId is ignored.
+    if (requester.role === "CASHIER") where.branchId = requester.branchId;
+    else if (branchId) where.branchId = branchId as string;
     const commissions = await prisma.commission.findMany({
       where,
       include: { product: true, cashier: true, branch: true, sale: true },
@@ -613,9 +620,12 @@ app.get("/api/incentives", authenticateToken, async (req, res) => {
 
 app.get("/api/shifts", authenticateToken, async (req, res) => {
   const { branchId, status } = req.query;
+  const requester = (req as any).user;
   try {
     const where: any = {};
-    if (branchId) where.branchId = branchId as string;
+    // CASHIER reads are locked to their own branch; client-supplied branchId is ignored.
+    if (requester.role === "CASHIER") where.branchId = requester.branchId;
+    else if (branchId) where.branchId = branchId as string;
     if (status) where.status = status as string;
     const shifts = await prisma.shift.findMany({
       where,
@@ -701,8 +711,12 @@ app.get("/api/users", authenticateToken, async (req, res) => {
 });
 
 app.get("/api/adjustments", authenticateToken, async (req, res) => {
+  const requester = (req as any).user;
   try {
+    // CASHIER reads are locked to their own branch; ADMIN/AUDIT see all branches.
+    const where: any = requester.role === "CASHIER" ? { branchId: requester.branchId } : {};
     const adjustments = await prisma.adjustment.findMany({
+      where,
       orderBy: { createdAt: "desc" },
       take: 200, 
     });
