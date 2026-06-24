@@ -5,23 +5,50 @@ description: How auth/role enforcement and socket.io branch scoping are meant to
 
 # AlfathPOS authorization & realtime scoping model
 
-## REST authorization is permissive by design
-Most mutating routes in the api-server are guarded only by `authenticateToken`
-(any logged-in user), NOT by role.
+## REST authorization: role matrix is enforced server-side
+RBAC is now implemented via a `requireRole(...roles)` middleware (placed after
+`authenticateToken`) that reads the role ONLY from the verified JWT claim, plus
+inline own-branch checks inside handlers. The owner's authoritative role matrix:
 
-**Why:** cashiers legitimately perform core POS operations — sales, refunds, stock
-adjustments/transfers, etc. Branch context is largely client-driven. A code review will
-flag this whole surface as "broken access control / missing RBAC."
+- **ADMIN** — everything.
+- **AUDIT** — all stock ops on ANY branch (adjust/opname/destroy, transfer, voucher
+  bulk import) + reads. NOT product/branch/user/config CRUD, NOT refund, NOT withdraw.
+- **CASHIER** — create sales, ADD stock, transfer stock, refund — all scoped to their
+  OWN branch only.
 
-**How to apply:** do NOT blanket-lock POS mutation/read routes (products, branches,
-stocks adjust/transfer, transactions, refunds, incentives, broad GETs) to ADMIN-only
-without first confirming the intended role matrix with the owner — it changes app
-function and breaks cashier flows. A real fix is a deliberate RBAC + server-side
-branch-scoping redesign, which is its own task.
+**Server-side scoping rules that must not regress:**
+- Cashier sales/refunds: branchId + cashier identity are forced from the JWT, never the
+  request body (prevents spoofing another branch/cashier).
+- Cashier stock adjust is ADD-ONLY: reject `newQty` (opname) and `STOCK_OUT`/negative
+  `qty` (destruction) — those are AUDIT/ADMIN only. The client distinguishes the three
+  flows purely by request shape: add = `{type:"STOCK_IN", qty:+n}`, opname =
+  `{newQty:n}`, destroy = `{type:"STOCK_OUT", qty:-n}`.
+- Shifts: open/patch = ADMIN+CASHIER (cashier forced/checked to own branch); delete =
+  ADMIN only (frontend never calls delete). AUDIT cannot open shifts.
+- Shopping-plans write/delete = ADMIN only (the UI's shopping-list menu is ADMIN-gated).
 
-**Safe to admin-gate (clear abuse, not normal cashier function):** user mutations
-(role self-escalation) and destructive bulk wipes. The login route must never carry a
-master-password bypass or a hardcoded JWT secret.
+**Why:** a prior review flagged the whole mutating surface as broken access control;
+the owner then gave the exact matrix above, so it is now enforced rather than permissive.
+
+**Deliberately left open to ALL authenticated roles:** `GET /api/users` — the frontend
+loads it at startup for every role to map cashier IDs→names; it already strips the
+password hash. Locking it to ADMIN breaks cashier/audit screens. Other broad GETs were
+left readable for the same reason.
+
+## Never leak password hashes through nested includes
+Read endpoints that do Prisma `include: { cashier: true }` (`GET /api/transactions`,
+`/api/incentives`, `/api/shifts`) return the FULL `User` row — including the bcrypt
+hash — to any authenticated client.
+
+**Why:** this is high-severity credential-material exposure; a code review will (rightly)
+fail on it.
+
+**How to apply:** map the result and strip `password` from the nested user before
+sending (a small `stripPw` helper). Strip ONLY `password` so the response shape is
+preserved — the frontend reads `cashier.name`, so do not switch to a narrow `select`
+that drops fields it relies on. The dedicated `GET /api/users` already strips it.
+
+The login route must never carry a master-password bypass or a hardcoded JWT secret.
 
 ## Realtime (socket.io) scoping rule
 Socket room membership must be derived from VERIFIED token claims, never from

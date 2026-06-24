@@ -106,6 +106,28 @@ const authenticateToken = (req: any, res: any, next: any) => {
   });
 };
 
+// Role-based authorization. Roles (from the verified JWT claims only — never the
+// request body): ADMIN = owner, full access. AUDIT = stock operations on ANY branch
+// (opname/adjust/destroy, transfer, voucher batch) plus read access, but NOT product,
+// branch, user, config management, refunds, or commission withdrawal. CASHIER = create
+// sales, add/transfer stock, and refund — all restricted to their OWN branch (enforced
+// inside each handler). Use this to gate routes by allowed roles.
+const requireRole = (...roles: string[]) => (req: any, res: any, next: any) => {
+  if (!req.user || !roles.includes(req.user.role)) {
+    return res.status(403).json({ error: "Forbidden: tidak memiliki izin untuk aksi ini." });
+  }
+  next();
+};
+
+// Remove the bcrypt password hash from a (possibly nested) user object before it is
+// returned to clients. Endpoints that `include: { cashier: true }` would otherwise leak
+// the hash of every cashier to any authenticated user.
+const stripPw = (u: any) => {
+  if (!u) return u;
+  const { password, ...rest } = u;
+  return rest;
+};
+
 // API Routes
 app.get("/api/health", async (req, res) => {
   try {
@@ -234,7 +256,7 @@ app.get("/api/products", authenticateToken, async (req, res) => {
   }
 });
 
-app.post("/api/products", authenticateToken, async (req, res) => {
+app.post("/api/products", authenticateToken, requireRole("ADMIN"), async (req, res) => {
   const { id, purchasePrice, ...data } = req.body;
   if (purchasePrice !== undefined) {
     (data as any).buyingPrice = purchasePrice;
@@ -254,7 +276,7 @@ app.post("/api/products", authenticateToken, async (req, res) => {
   }
 });
 
-app.delete("/api/products/:id", authenticateToken, async (req, res) => {
+app.delete("/api/products/:id", authenticateToken, requireRole("ADMIN"), async (req, res) => {
   const productId = req.params.id;
   try {
     await prisma.$transaction(async (tx) => {
@@ -285,7 +307,7 @@ app.get("/api/branches", authenticateToken, async (req, res) => {
   }
 });
 
-app.post("/api/branches", authenticateToken, async (req, res) => {
+app.post("/api/branches", authenticateToken, requireRole("ADMIN"), async (req, res) => {
   const { name, address, phone, allowEmployeeInput } = req.body;
   try {
     const branch = await prisma.branch.create({
@@ -297,7 +319,7 @@ app.post("/api/branches", authenticateToken, async (req, res) => {
   }
 });
 
-app.patch("/api/branches/:id", authenticateToken, async (req, res) => {
+app.patch("/api/branches/:id", authenticateToken, requireRole("ADMIN"), async (req, res) => {
   const { name, address, phone, allowEmployeeInput } = req.body;
   try {
     const branch = await prisma.branch.update({
@@ -399,10 +421,14 @@ app.patch("/api/config", authenticateToken, async (req, res) => {
   }
 });
 
-app.post("/api/transactions", authenticateToken, async (req, res) => {
+app.post("/api/transactions", authenticateToken, requireRole("ADMIN", "CASHIER"), async (req, res) => {
   const { branchId, cashierId, items, customerName, total, totalCommission } = req.body;
-  const actualCashierId = cashierId || (req as any).user.userId;
-  const actualBranchId = branchId || (req as any).user.branchId;
+  const requester = (req as any).user;
+  // Cashiers are locked to their own branch and identity: a cashier can never post a
+  // sale for another branch or attribute it to another cashier, regardless of body.
+  const actualCashierId = requester.role === "CASHIER" ? requester.userId : (cashierId || requester.userId);
+  const actualBranchId = requester.role === "CASHIER" ? requester.branchId : (branchId || requester.branchId);
+  if (!actualBranchId) return res.status(400).json({ error: "Cabang tidak ditentukan untuk transaksi ini." });
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -550,7 +576,7 @@ app.get("/api/transactions", authenticateToken, async (req, res) => {
       },
       orderBy: { createdAt: "desc" }
     });
-    res.json(sales);
+    res.json(sales.map((s: any) => ({ ...s, cashier: stripPw(s.cashier) })));
   } catch (error: any) {
     console.error("Fetch Sales Error [Full]:", {
       code: error.code,
@@ -578,7 +604,7 @@ app.get("/api/incentives", authenticateToken, async (req, res) => {
       include: { product: true, cashier: true, branch: true, sale: true },
       orderBy: { createdAt: "desc" }
     });
-    res.json(commissions);
+    res.json(commissions.map((c: any) => ({ ...c, cashier: stripPw(c.cashier) })));
   } catch (error) {
     console.error("Commissions Fetch Error:", error);
     res.status(500).json({ error: "Failed to fetch commissions" });
@@ -596,19 +622,23 @@ app.get("/api/shifts", authenticateToken, async (req, res) => {
       include: { cashier: true, branch: true },
       orderBy: { openTime: "desc" }
     });
-    res.json(shifts);
+    res.json(shifts.map((s: any) => ({ ...s, cashier: stripPw(s.cashier) })));
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch shifts" });
   }
 });
 
-app.post("/api/shifts", authenticateToken, async (req, res) => {
+app.post("/api/shifts", authenticateToken, requireRole("ADMIN", "CASHIER"), async (req, res) => {
   const { branchId, cashierId, initialCash, shiftDate, shiftType } = req.body;
+  const requester = (req as any).user;
+  // Cashiers may only open shifts for their own branch and under their own identity.
+  const shiftBranchId = requester.role === "CASHIER" ? requester.branchId : branchId;
+  const shiftCashierId = requester.role === "CASHIER" ? requester.userId : cashierId;
   try {
     const shift = await prisma.shift.create({
       data: {
-        branchId,
-        cashierId,
+        branchId: shiftBranchId,
+        cashierId: shiftCashierId,
         initialCash,
         shiftDate,
         shiftType,
@@ -622,9 +652,17 @@ app.post("/api/shifts", authenticateToken, async (req, res) => {
   }
 });
 
-app.patch("/api/shifts/:id", authenticateToken, async (req, res) => {
+app.patch("/api/shifts/:id", authenticateToken, requireRole("ADMIN", "CASHIER"), async (req, res) => {
   const { actualCash, totalSales, difference, status } = req.body;
+  const requester = (req as any).user;
   try {
+    if (requester.role === "CASHIER") {
+      const existing = await prisma.shift.findUnique({ where: { id: req.params.id }, select: { branchId: true } });
+      if (!existing) return res.status(404).json({ error: "Shift tidak ditemukan." });
+      if (existing.branchId !== requester.branchId) {
+        return res.status(403).json({ error: "Kasir hanya dapat mengubah shift cabangnya sendiri." });
+      }
+    }
     const shift = await prisma.shift.update({
       where: { id: req.params.id },
       data: {
@@ -641,7 +679,7 @@ app.patch("/api/shifts/:id", authenticateToken, async (req, res) => {
   }
 });
 
-app.delete("/api/shifts/:id", authenticateToken, async (req, res) => {
+app.delete("/api/shifts/:id", authenticateToken, requireRole("ADMIN"), async (req, res) => {
   try {
     await prisma.shift.delete({ where: { id: req.params.id } });
     res.json({ success: true });
@@ -674,8 +712,19 @@ app.get("/api/adjustments", authenticateToken, async (req, res) => {
   }
 });
 
-app.post("/api/stocks/adjust", authenticateToken, async (req, res) => {
+app.post("/api/stocks/adjust", authenticateToken, requireRole("ADMIN", "AUDIT", "CASHIER"), async (req, res) => {
   const { productId, branchId, qty, type, reason, oldQty, newQty } = req.body;
+  const requester = (req as any).user;
+  // Cashiers may only ADD stock to their own branch. Opname (setting newQty) and
+  // removal/destruction (STOCK_OUT / negative qty) are reserved for AUDIT/ADMIN.
+  if (requester.role === "CASHIER") {
+    if (branchId !== requester.branchId) {
+      return res.status(403).json({ error: "Kasir hanya dapat mengubah stok cabangnya sendiri." });
+    }
+    if (newQty !== undefined || (type && type !== "STOCK_IN") || (qty !== undefined && qty <= 0)) {
+      return res.status(403).json({ error: "Kasir hanya dapat menambah stok, bukan opname atau pengurangan/pemusnahan." });
+    }
+  }
   try {
     const result = await prisma.$transaction(async (tx) => {
       // Update ProductStock
@@ -706,8 +755,13 @@ app.post("/api/stocks/adjust", authenticateToken, async (req, res) => {
   }
 });
 
-app.post("/api/stocks/transfer", authenticateToken, async (req, res) => {
+app.post("/api/stocks/transfer", authenticateToken, requireRole("ADMIN", "AUDIT", "CASHIER"), async (req, res) => {
   const { productId, qty, targetBranchId, sourceBranchId } = req.body;
+  const requester = (req as any).user;
+  // Cashiers may only transfer stock OUT of their own branch; ADMIN/AUDIT may transfer between any branches.
+  if (requester.role === "CASHIER" && sourceBranchId !== requester.branchId) {
+    return res.status(403).json({ error: "Kasir hanya dapat transfer stok dari cabangnya sendiri." });
+  }
   try {
     const result = await prisma.$transaction(async (tx) => {
       // 1. Kurangi dari asal — guard atomik agar stok asal tidak bisa minus walau
@@ -764,8 +818,13 @@ app.post("/api/stocks/transfer", authenticateToken, async (req, res) => {
   }
 });
 
-app.post("/api/voucher-sns/bulk", authenticateToken, async (req, res) => {
+app.post("/api/voucher-sns/bulk", authenticateToken, requireRole("ADMIN", "AUDIT", "CASHIER"), async (req, res) => {
   const { branchId, productId, sns, productName } = req.body;
+  const requester = (req as any).user;
+  // Cashiers may only add voucher stock to their own branch; ADMIN/AUDIT may add to any branch.
+  if (requester.role === "CASHIER" && branchId !== requester.branchId) {
+    return res.status(403).json({ error: "Kasir hanya dapat menambah stok di cabangnya sendiri." });
+  }
   try {
     const result = await prisma.$transaction(async (tx) => {
       // 1. Create VoucherSN records
@@ -845,8 +904,17 @@ app.delete("/api/users/:id", authenticateToken, async (req, res) => {
   }
 });
 
-app.post("/api/transactions/:id/refund", authenticateToken, async (req, res) => {
+app.post("/api/transactions/:id/refund", authenticateToken, requireRole("ADMIN", "CASHIER"), async (req, res) => {
   try {
+    const requester = (req as any).user;
+    // Cashiers may only refund sales belonging to their own branch; ADMIN may refund any.
+    if (requester.role === "CASHIER") {
+      const existing = await prisma.sale.findUnique({ where: { id: req.params.id }, select: { branchId: true } });
+      if (!existing) return res.status(404).json({ error: "Transaksi tidak ditemukan." });
+      if (existing.branchId !== requester.branchId) {
+        return res.status(403).json({ error: "Kasir hanya dapat me-refund transaksi cabangnya sendiri." });
+      }
+    }
     const result = await prisma.$transaction(async (tx) => {
       const sale = await tx.sale.findUnique({
         where: { id: req.params.id },
@@ -906,7 +974,7 @@ app.post("/api/transactions/:id/refund", authenticateToken, async (req, res) => 
   }
 });
 
-app.post("/api/incentives/withdraw", authenticateToken, async (req, res) => {
+app.post("/api/incentives/withdraw", authenticateToken, requireRole("ADMIN"), async (req, res) => {
   const { branchId } = req.body;
   try {
     const result = await prisma.commission.updateMany({
@@ -978,7 +1046,7 @@ app.get("/api/shopping-plans", authenticateToken, async (req, res) => {
   }
 });
 
-app.post("/api/shopping-plans", authenticateToken, async (req: any, res) => {
+app.post("/api/shopping-plans", authenticateToken, requireRole("ADMIN"), async (req: any, res) => {
   try {
     const { title, items, status } = req.body;
     // Security: creatorId is always taken from the authenticated token, never from
@@ -998,7 +1066,7 @@ app.post("/api/shopping-plans", authenticateToken, async (req: any, res) => {
   }
 });
 
-app.delete("/api/shopping-plans/:id", authenticateToken, async (req, res) => {
+app.delete("/api/shopping-plans/:id", authenticateToken, requireRole("ADMIN"), async (req, res) => {
   try {
     await prisma.shoppingPlan.delete({ where: { id: req.params.id } });
     res.json({ success: true });
