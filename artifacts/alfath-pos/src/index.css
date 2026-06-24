@@ -41,6 +41,11 @@ body {
   background-color: var(--canvas-bg);
   color: var(--text-main);
   transition: background-color 0.2s ease, color 0.2s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv11", "ss01";
+  letter-spacing: -0.011em;
 }
 
 /* Global Manual Dark Mode Overrides */
@@ -349,4 +354,67 @@ body {
 
 body {
   @apply font-sans;
+}
+
+/* Mobile card-view for list-style tables (opt-in via .mobile-cards). */
+@media (max-width: 640px) {
+  table.mobile-cards thead {
+    display: none;
+  }
+  table.mobile-cards,
+  table.mobile-cards tbody,
+  table.mobile-cards tr,
+  table.mobile-cards td {
+    display: block;
+    width: 100%;
+  }
+  table.mobile-cards tr {
+    margin: 0 0 0.75rem 0;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 1rem;
+    padding: 0.35rem 0.85rem;
+    background: var(--card-bg, #ffffff);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+  table.mobile-cards td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    text-align: right !important;
+    padding: 0.45rem 0 !important;
+    border: none !important;
+    border-bottom: 1px dashed var(--border-color, #eef2f7) !important;
+  }
+  table.mobile-cards tr td:last-child {
+    border-bottom: none !important;
+  }
+  table.mobile-cards td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-weight: 800;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-mute, #94a3b8);
+    text-align: left;
+  }
+  /* Cells flagged as the card title span full width, no label. */
+  table.mobile-cards td[data-card-title] {
+    justify-content: flex-start;
+    text-align: left !important;
+    padding-bottom: 0.6rem !important;
+  }
+  table.mobile-cards td[data-card-title]::before {
+    content: none;
+  }
+  /* Keep the empty-state row centered like a normal block. */
+  table.mobile-cards td[colspan] {
+    justify-content: center;
+    text-align: center !important;
+    border-bottom: none !important;
+  }
+  table.mobile-cards td[colspan]::before {
+    content: none;
+  }
 }

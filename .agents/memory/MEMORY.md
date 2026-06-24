@@ -2,3 +2,4 @@
 - [Prisma dual-schema pitfall](prisma-dual-schema.md) — Prisma prefers `./schema.prisma` over `./prisma/schema.prisma`; a stray root copy silently overrides edits.
 - [AlfathPOS authz & realtime model](alfathpos-authz-model.md) — REST is token-only by design; socket rooms must come from verified JWT (not client-sent role); stock decrements need conditional updateMany guard.
 - [AlfathPOS Docker deploy](alfathpos-docker-deploy.md) — single-stage api image keeps pnpm symlinks (Prisma resolution); entrypoint `db push` auto-creates tables; nginx proxies /api + /socket.io; build frontend with BASE_PATH=/.
+- [AlfathPOS frontend UI conventions](alfath-pos-ui.md) — fragile dark-mode override palette, alert()->toast (confirm() native), opt-in .mobile-cards for list tables only, ImageMagick not sharp.

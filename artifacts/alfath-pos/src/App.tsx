@@ -74,6 +74,16 @@ import { useBarcodeScanner } from "./hooks/useBarcodeScanner";
 
 import { ProductTable } from "./components/ProductTable";
 import { CustomSelect } from "./components/CustomSelect";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Cell,
+} from "recharts";
 const ScannerModal = ({
   onClose,
   onScan,
@@ -558,10 +568,14 @@ export default function App() {
     // Override original window.alert safety
     const originalAlert = window.alert;
     window.alert = (msg: string) => {
+      const text = String(msg ?? "");
+      const lower = text.toLowerCase();
+      const successWords = ["berhasil", "selesai", "sukses", "ditambahkan", "dicatat", "tersimpan", "disimpan", "diperbarui", "dibersihkan", "ditransfer", "dicairkan", "dipatenkan", "ditutup & dipatenkan"];
+      const type: "info" | "warning" | "success" = successWords.some((w) => lower.includes(w)) ? "success" : "info";
       // Dispatches custom event
       window.dispatchEvent(
         new CustomEvent("app-custom-alert", {
-          detail: { message: msg, type: "info" }
+          detail: { message: text, type }
         })
       );
     };
@@ -2358,22 +2372,19 @@ export default function App() {
     return (
       <div className="flex min-h-[100dvh] bg-slate-900 font-sans items-center justify-center p-4">
         <div className="bg-white p-6 md:p-10 rounded-[32px] border border-slate-200 max-w-md w-full text-center shadow-2xl animate-in zoom-in duration-300">
-          <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl transform rotate-3">
-            <Store className="w-10 h-10 text-white transform -rotate-3" />
-          </div>
+          <img
+            src={`${import.meta.env.BASE_URL}app-icon-512.png`}
+            alt="Alfath Pulsa POS"
+            className="w-20 h-20 rounded-3xl mx-auto mb-8 shadow-xl shadow-blue-200 object-cover"
+          />
           <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tighter mb-2 uppercase">
             Alfath Pulsa POS
           </h1>
-          <p className="text-[10px] md:text-xs font-bold text-slate-400 mb-4 uppercase tracking-[0.2em]">
-            Enterprise Multi-Branch System
+          <p className="text-[10px] md:text-xs font-bold text-slate-400 mb-6 uppercase tracking-[0.2em]">
+            Sistem Manajemen Multi-Cabang
           </p>
-          <div className="bg-amber-50 rounded-xl p-2 mb-6 border border-amber-200">
-             <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest">
-               Debug Build: 2026-05-18 v4
-             </p>
-          </div>
-          
-          <div className="mt-8 flex flex-col gap-4">
+
+          <div className="mt-2 flex flex-col gap-4">
               <form 
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -2409,19 +2420,6 @@ export default function App() {
                   Masuk ke Sistem <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
-          </div>
-
-          <div className="mt-8 pt-8 border-t border-slate-50 flex flex-col gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                   localStorage.clear();
-                   window.location.reload();
-                }}
-                className="w-full text-slate-400 font-bold py-2 px-4 rounded-2xl hover:bg-slate-50 transition text-[8px] uppercase tracking-widest"
-              >
-                Clear Cache & Force Reload
-              </button>
           </div>
 
           <div className="mt-10 pt-6 border-t border-slate-100">
@@ -4698,7 +4696,7 @@ export default function App() {
                         </div>
                       </div>
                       <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
+                        <table className="w-full text-left border-collapse mobile-cards">
                           <thead>
                             <tr className="bg-slate-50/50 border-b border-slate-100">
                               <th className="px-4 md:px-6 py-3 md:py-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] w-1/3 text-left">
@@ -4776,7 +4774,7 @@ export default function App() {
                                   key={`${a.product.id}-${a.branch.id}`}
                                   className="hover:bg-slate-50/50 transition-colors group"
                                 >
-                                  <td className="px-4 md:px-6 py-3 md:py-4 text-left">
+                                  <td data-card-title className="px-4 md:px-6 py-3 md:py-4 text-left">
                                     <p className="font-bold text-slate-800 text-sm tracking-tight text-left">
                                       {a.product.name}
                                     </p>
@@ -4784,24 +4782,24 @@ export default function App() {
                                       {a.product.category}
                                     </p>
                                   </td>
-                                  <td className="px-4 md:px-6 py-3 md:py-4 text-left">
+                                  <td data-label="Cabang" className="px-4 md:px-6 py-3 md:py-4 text-left">
                                     <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-[9px] font-black uppercase tracking-tight">
                                       {a.branch.name}
                                     </span>
                                   </td>
-                                  <td className="px-4 md:px-6 py-3 md:py-4 text-center">
+                                  <td data-label="Stok Skrg" className="px-4 md:px-6 py-3 md:py-4 text-center">
                                     <p
                                       className={`font-mono font-black text-sm ${a.qty === 0 ? "text-red-500" : "text-amber-500"}`}
                                     >
                                       {a.qty}
                                     </p>
                                   </td>
-                                  <td className="px-4 md:px-6 py-3 md:py-4 text-center">
+                                  <td data-label="Batas Min" className="px-4 md:px-6 py-3 md:py-4 text-center">
                                     <p className="font-mono font-bold text-slate-400 text-xs">
                                       {a.product.minStock}
                                     </p>
                                   </td>
-                                  <td className="px-4 md:px-6 py-3 md:py-4 text-right">
+                                  <td data-label="Aksi" className="px-4 md:px-6 py-3 md:py-4 text-right">
                                     <button
                                       onClick={() => {
                                         setIsCreatingPlan(true);
@@ -8369,27 +8367,72 @@ export default function App() {
                          <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 mb-6">
                             <Activity className="w-4 h-4 text-blue-500" /> Performa Cabang Periode Ini
                           </h4>
-                          <div className="space-y-4">
-                            {branches.map((b) => {
-                              const branchRevenue = dashboardStats.branchBreakdown[b.id] || 0;
-                               const maxRevenue = Math.max(...Object.values(dashboardStats.branchBreakdown) as number[], 1);
-                               
-                               return (
-                                 <div key={b.id} className="space-y-1">
-                                   <div className="flex justify-between text-[10px] font-bold uppercase text-slate-600">
-                                     <span>{b.name}</span>
-                                     <span>Rp {branchRevenue.toLocaleString("id-ID")}</span>
-                                   </div>
-                                   <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                     <div 
-                                       className="h-full bg-blue-600 rounded-full transition-all duration-1000"
-                                       style={{ width: `${(branchRevenue / maxRevenue) * 100}%` }}
-                                     />
-                                   </div>
-                                 </div>
-                               )
-                            })}
-                          </div>
+                          {(() => {
+                            const chartData = branches
+                              .map((b) => ({
+                                name: b.name,
+                                revenue: dashboardStats.branchBreakdown[b.id] || 0,
+                              }))
+                              .sort((a, b) => b.revenue - a.revenue);
+                            const hasData = chartData.some((d) => d.revenue > 0);
+                            const palette = ["#2563eb", "#4f46e5", "#0891b2", "#7c3aed", "#0d9488", "#db2777"];
+                            const fmtShort = (v: number) =>
+                              v >= 1_000_000
+                                ? `${(v / 1_000_000).toFixed(1)}jt`
+                                : v >= 1_000
+                                ? `${Math.round(v / 1_000)}rb`
+                                : `${v}`;
+                            if (!hasData) {
+                              return (
+                                <div className="h-[260px] flex flex-col items-center justify-center text-center gap-2 text-slate-300">
+                                  <Activity className="w-8 h-8" />
+                                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                    Belum ada data penjualan periode ini
+                                  </p>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="h-[260px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                                    <XAxis
+                                      dataKey="name"
+                                      tick={{ fontSize: 10, fontWeight: 700, fill: "#64748b" }}
+                                      tickLine={false}
+                                      axisLine={{ stroke: "#e2e8f0" }}
+                                      interval={0}
+                                    />
+                                    <YAxis
+                                      tickFormatter={fmtShort}
+                                      tick={{ fontSize: 10, fontWeight: 700, fill: "#94a3b8" }}
+                                      tickLine={false}
+                                      axisLine={false}
+                                      width={44}
+                                    />
+                                    <RechartsTooltip
+                                      cursor={{ fill: "rgba(37,99,235,0.06)" }}
+                                      formatter={(value: any) => [`Rp ${Number(value).toLocaleString("id-ID")}`, "Omset"]}
+                                      contentStyle={{
+                                        borderRadius: 14,
+                                        border: "1px solid #e2e8f0",
+                                        boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                      }}
+                                      labelStyle={{ fontWeight: 800, color: "#0f172a" }}
+                                    />
+                                    <Bar dataKey="revenue" radius={[8, 8, 0, 0]} maxBarSize={56}>
+                                      {chartData.map((_, i) => (
+                                        <Cell key={i} fill={palette[i % palette.length]} />
+                                      ))}
+                                    </Bar>
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              </div>
+                            );
+                          })()}
                       </div>
 
                       {/* TOP PRODUCTS */}

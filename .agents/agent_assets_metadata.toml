@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "X3BwzFapuplPDJS_xRtxT"
+uri = "file://artifacts/alfath-pos/public/app-icon.png"
+type = "image"
+title = "alfath app icon clean"

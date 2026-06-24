@@ -40,28 +40,28 @@ export default defineConfig({
         clientsClaim: true,
         skipWaiting: true,
       },
-      includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg"],
+      includeAssets: ["favicon.svg", "apple-touch-icon.png"],
       manifest: {
         name: "Alfath Pulsa Manajemen",
         short_name: "AlfathPOS",
         description:
           "Sistem Manajemen Alfath Pulsa - POS, Stok, dan Laporan Transaksi.",
-        theme_color: "#1e293b",
+        theme_color: "#1e3a8a",
         background_color: "#f8fafc",
         display: "standalone",
         icons: [
           {
-            src: "https://placehold.co/192x192/1e293b/white?text=Alfath\nPOS&font=inter",
+            src: "app-icon-192.png",
             sizes: "192x192",
             type: "image/png",
           },
           {
-            src: "https://placehold.co/512x512/1e293b/white?text=Alfath\nPOS&font=inter",
+            src: "app-icon-512.png",
             sizes: "512x512",
             type: "image/png",
           },
           {
-            src: "https://placehold.co/512x512/1e293b/white?text=Alfath\nPOS&font=inter",
+            src: "app-icon-512.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "any maskable",
