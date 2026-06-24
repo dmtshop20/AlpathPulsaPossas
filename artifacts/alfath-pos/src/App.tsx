@@ -2781,23 +2781,33 @@ export default function App() {
           <main className="flex-1 overflow-hidden flex bg-slate-50/50 relative h-full">
             {/* --- 1. ADMIN: PENGATURAN AKSES KARYAWAN --- */}
             {activeMenu === "employees" && profile?.role === "ADMIN" && (
-              <div className="flex-1 flex flex-col p-4 md:p-4 md:p-6 overflow-hidden">
-                <div className="bg-white rounded shadow-sm border border-slate-200 flex flex-col h-full">
-                  <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0">
-                    <div>
-                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest">
-                        Atur Role & Cabang Tim
-                      </h3>
-                      <p className="text-[10px] font-medium text-slate-500 mt-0.5">
-                        Isi "Nama Karyawan" agar muncul di pilihan shift kasir.
-                        Jika 1 Akun dipakai 2 orang, pisahkan nama di kolom Petugas.
-                      </p>
+              <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden">
+                <div className="bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden">
+                  <div className="p-4 md:p-5 border-b border-slate-200 bg-slate-50/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shrink-0">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 shrink-0 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
+                        <Users className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">
+                            Atur Role & Cabang Tim
+                          </h3>
+                          <span className="text-[9px] font-black text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full uppercase tracking-widest">
+                            {users.length} Akun
+                          </span>
+                        </div>
+                        <p className="text-[10px] font-medium text-slate-500 mt-1 max-w-md leading-relaxed">
+                          Isi "Nama Karyawan" agar muncul di pilihan shift kasir.
+                          Jika 1 Akun dipakai 2 orang, pisahkan nama di kolom Petugas.
+                        </p>
+                      </div>
                     </div>
                     <button 
                       onClick={() => setShowUserForm(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded text-[10px] uppercase tracking-widest transition-all shadow-sm"
+                      className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-black px-4 py-2.5 rounded-xl text-[10px] uppercase tracking-widest transition-all shadow-sm shadow-blue-200 active:scale-95 flex items-center gap-1.5"
                     >
-                      + Tambah Akun Login
+                      <Plus className="w-3.5 h-3.5" /> Tambah Akun Login
                     </button>
                   </div>
                   <div className="flex-1 overflow-auto">
@@ -2819,7 +2829,31 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-sm">
-                        {users.map((emp) => (
+                        {users.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="px-4 py-16 text-center">
+                              <div className="flex flex-col items-center gap-3 text-slate-300">
+                                <Users className="w-10 h-10" />
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                  Belum ada akun karyawan
+                                </p>
+                                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-300">
+                                  Klik "Tambah Akun Login" untuk membuat akses tim
+                                </p>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                        {[...users]
+                          .sort((a, b) => {
+                            const an = branches.find((x) => x.id === a.branchId)?.name || "\uffff";
+                            const bn = branches.find((x) => x.id === b.branchId)?.name || "\uffff";
+                            return (
+                              an.localeCompare(bn) ||
+                              (a.name || a.displayName || "").localeCompare(b.name || b.displayName || "")
+                            );
+                          })
+                          .map((emp) => (
                           <tr key={emp.id} className="hover:bg-slate-50">
                             <td className="px-4 py-3">
                               <div className="space-y-1">
