@@ -1,0 +1,100 @@
+# AlfathPOS - Dockge / "pull straight from GitHub" deployment.
+#
+# This Compose file builds the app DIRECTLY from the GitHub repository, so you
+# do NOT need to clone anything onto the server. Just paste this whole file into
+# Dockge's compose editor, fill in the .env box, and deploy.
+#
+# Requirements:
+#   - The GitHub repo must be PUBLIC (a git build context cannot log in).
+#     For a private repo, put a token in the URL, e.g.:
+#       https://<TOKEN>@github.com/dmtshop20/AlpathPulsaPossas.git#main
+#   - Push your latest code to GitHub first, otherwise the server builds an old version.
+#
+# After deploy, open:  http://<server-ip>:8080   (login: admin / admin123)
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-alfath}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-alfath}
+      POSTGRES_DB: ${POSTGRES_DB:-alfath}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-alfath} -d ${POSTGRES_DB:-alfath}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      context: https://github.com/dmtshop20/AlpathPulsaPossas.git#main
+      dockerfile: artifacts/api-server/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-alfath}:${POSTGRES_PASSWORD:-alfath}@db:5432/${POSTGRES_DB:-alfath}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-change-this-to-a-long-random-string}
+      PORT: 8080
+      NODE_ENV: production
+
+  web:
+    build:
+      context: https://github.com/dmtshop20/AlpathPulsaPossas.git#main
+      dockerfile: artifacts/alfath-pos/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-8080}:80"
+
+  # Automated database backups -> written to ./backups (inside this stack's folder).
+  # The backup script is inlined here so nothing needs to exist on the host.
+  # Restore a dump with:
+  #   gunzip -c backups/alfath-YYYYMMDD-HHMMSS.sql.gz | docker compose exec -T db psql -U alfath -d alfath
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    user: "0:0"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-alfath}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-alfath}
+      PGDATABASE: ${POSTGRES_DB:-alfath}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-21600}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+    volumes:
+      - ./backups:/backups
+    entrypoint:
+      - sh
+      - -c
+      - |
+        INTERVAL="$${BACKUP_INTERVAL_SECONDS:-21600}"
+        KEEP_DAYS="$${BACKUP_KEEP_DAYS:-14}"
+        mkdir -p /backups
+        echo "[backup] started; interval=$${INTERVAL}s keep=$${KEEP_DAYS}d target=/backups"
+        while true; do
+          TS="$$(date +%Y%m%d-%H%M%S)"
+          FILE="/backups/alfath-$${TS}.sql.gz"
+          TMP="$${FILE}.tmp"
+          echo "[backup] $$(date '+%Y-%m-%d %H:%M:%S') dumping -> $${FILE}"
+          if pg_dump --clean --if-exists --no-owner --no-privileges | gzip -c > "$${TMP}"; then
+            mv "$${TMP}" "$${FILE}"
+            echo "[backup] ok: $${FILE} ($$(du -h "$${FILE}" | cut -f1))"
+          else
+            echo "[backup] FAILED dump at $${TS}" >&2
+            rm -f "$${TMP}"
+          fi
+          find /backups -name 'alfath-*.sql.gz' -type f -mtime +"$${KEEP_DAYS}" -delete 2>/dev/null || true
+          sleep "$${INTERVAL}"
+        done
+
+volumes:
+  pgdata:
